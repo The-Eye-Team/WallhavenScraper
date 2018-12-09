@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/labstack/gommon/color"
 	"os"
 	"path/filepath"
 
@@ -28,6 +29,14 @@ func parseArgs(args []string) {
 		Help:     "CSV for writing metadata",
 		Default:  "wallhaven.csv"})
 
+	username := parser.String("u", "username", &argparse.Options{
+		Required: false,
+		Help:     "Username"})
+
+	password := parser.String("p", "password", &argparse.Options{
+		Required: false,
+		Help:     "Password"})
+
 	// Parse input
 	err := parser.Parse(args)
 	if err != nil {
@@ -44,4 +53,13 @@ func parseArgs(args []string) {
 
 	arguments.Concurrency = *concurrency
 	arguments.CSV = *csv
+
+	// Login if username and password are given
+	if *username != "" && *password != "" {
+		err := login(*username, *password)
+		if err != nil {
+			fmt.Println(crossPre + color.Red(" Error logging in: " + err.Error()))
+			err = nil
+		}
+	}
 }

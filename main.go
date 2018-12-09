@@ -5,11 +5,13 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/http/cookiejar"
 	"os"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/extensions"
@@ -31,6 +33,10 @@ var client = http.Client{
 		r.URL.Opaque = r.URL.Path
 		return nil
 	},
+}
+
+func init() {
+	client.Jar, _ = cookiejar.New(nil)
 }
 
 func downloadFile(URL string, file *os.File, client *http.Client) error {
@@ -111,10 +117,13 @@ func downloadWallpaper(index string, channel chan<- []string, worker *sync.WaitG
 	pictureFile, err := os.Create(arguments.Output + "/" + index + ".jpg")
 	if err != nil {
 		log.Println("Unable to create the file:", err)
+		return
 	}
+
 	err = downloadFile("https://wallpapers.wallhaven.cc/wallpapers/full/wallhaven-"+index+".jpg", pictureFile, &client)
 	if err != nil {
 		log.Println("Unable to download the file:", err)
+		return
 	}
 
 	// Log on request
@@ -128,14 +137,21 @@ func downloadWallpaper(index string, channel chan<- []string, worker *sync.WaitG
 	})
 
 	// Log on error
-	c.OnError(func(_ *colly.Response, err error) {
-		fmt.Println(crossPre+
-			color.Yellow(" [")+
-			color.Red(index)+
-			color.Yellow("]")+
-			color.Red(" Something went wrong:"),
-			err)
-		runtime.Goexit()
+	c.OnError(func(r *colly.Response, err error) {
+		if r.StatusCode == http.StatusUnauthorized {
+			fmt.Printf("Not authorized to download %s.\n", index)
+		} else if r.StatusCode == http.StatusGatewayTimeout {
+			time.Sleep(100 * time.Millisecond)
+			downloadWallpaper(index, channel, worker)
+		} else {
+			fmt.Println(crossPre+
+				color.Yellow(" [")+
+				color.Red(index)+
+				color.Yellow("]")+
+				color.Red(" Something went wrong:"),
+				err)
+			runtime.Goexit()
+		}
 	})
 
 	// Visit page and fill collector
