@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io"
 	"log"
@@ -35,7 +36,13 @@ var client = http.Client{}
 var shouldExit int32 = 0
 
 func init() {
+	// Remember cookies
 	client.Jar, _ = cookiejar.New(nil)
+
+	// Disable HTTP/2: Empty TLSNextProto map
+	client.Transport = http.DefaultTransport
+	client.Transport.(*http.Transport).TLSNextProto =
+		make(map[string]func(authority string, c *tls.Conn) http.RoundTripper)
 }
 
 func downloadFile(URL string, file *os.File, client *http.Client) error {
@@ -137,12 +144,13 @@ func downloadWallpaper(index string, channel chan<- []string, worker *sync.WaitG
 
 	// Log on error
 	c.OnError(func(r *colly.Response, err error) {
-		if r.StatusCode == http.StatusUnauthorized {
+		switch r.StatusCode {
+		case http.StatusUnauthorized:
 			fmt.Printf("Not authorized to download %s.\n", index)
-		} else if r.StatusCode == http.StatusGatewayTimeout {
+		case http.StatusBadGateway:
 			time.Sleep(100 * time.Millisecond)
 			downloadWallpaper(index, channel, worker)
-		} else {
+		default:
 			fmt.Println(crossPre+
 				color.Yellow(" [")+
 				color.Red(index)+
