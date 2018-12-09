@@ -30,12 +30,7 @@ var arguments = struct {
 var checkPre = color.Yellow("[") + color.Green("✓") + color.Yellow("]")
 var crossPre = color.Yellow("[") + color.Red("✗") + color.Yellow("]")
 
-var client = http.Client{
-	CheckRedirect: func(r *http.Request, via []*http.Request) error {
-		r.URL.Opaque = r.URL.Path
-		return nil
-	},
-}
+var client = http.Client{}
 
 var shouldExit int32 = 0
 
