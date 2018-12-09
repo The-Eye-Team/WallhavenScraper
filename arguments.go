@@ -56,9 +56,15 @@ func parseArgs(args []string) {
 
 	// Login if username and password are given
 	if *username != "" && *password != "" {
-		err := login(*username, *password)
+		var err error
+		err = login(*username, *password)
 		if err != nil {
 			fmt.Println(crossPre + color.Red(" Error logging in: " + err.Error()))
+			err = nil
+		}
+		err = setProfileNsfw()
+		if err != nil {
+			fmt.Println(crossPre + color.Red(" Error setting profile to NSFW: " + err.Error()))
 			err = nil
 		}
 	}
