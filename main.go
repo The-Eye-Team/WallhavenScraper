@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"os"
+	"os/signal"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gocolly/colly"
@@ -34,6 +36,8 @@ var client = http.Client{
 		return nil
 	},
 }
+
+var shouldExit int32 = 0
 
 func init() {
 	client.Jar, _ = cookiejar.New(nil)
@@ -178,6 +182,9 @@ func main() {
 	var worker sync.WaitGroup
 	var count int
 
+	// Create Ctrl+C Handler
+	go listenCtrlC()
+
 	// Parse arguments from command line
 	parseArgs(os.Args)
 
@@ -188,6 +195,11 @@ func main() {
 
 	// Loop through wallhaven's wallpapers
 	for index := 1; ; index++ {
+		// Check if exit requested
+		if atomic.LoadInt32(&shouldExit) != 0 {
+			break
+		}
+
 		if _, err := os.Stat(arguments.Output + "/" + strconv.Itoa(index) + ".jpg"); os.IsNotExist(err) {
 			worker.Add(1)
 			count++
@@ -205,4 +217,11 @@ func main() {
 			count = 0
 		}
 	}
+}
+
+func listenCtrlC() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	<-c
+	atomic.StoreInt32(&shouldExit, 1)
 }
