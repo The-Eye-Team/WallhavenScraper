@@ -21,7 +21,7 @@ func openFile(fileName string) (f *os.File, created bool, err error) {
 		return csvFile, true, nil
 	} else if err == nil {
 		// CSV exists, append
-		csvFile, err := os.Open(fileName)
+		csvFile, err := os.OpenFile(fileName, os.O_WRONLY | os.O_APPEND, 0666)
 		if err != nil {
 			log.Fatalf("Cannot open file %q: %s\n", fileName, err)
 			os.Exit(1)
