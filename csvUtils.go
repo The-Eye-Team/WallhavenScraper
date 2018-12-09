@@ -45,7 +45,11 @@ func writer(c <-chan []string) {
 	w.Flush()
 
 	if created {
-		w.Write([]string{"ID", "Tags", "NSFW", "Uploader", "Category", "Views", "Size", "Favorites", "UploadDate", "Path", "URL", "ImageURL"})
+		err := w.Write([]string{"ID", "Tags", "NSFW", "Uploader", "Category", "Views", "Size", "Favorites", "UploadDate", "Path", "URL", "ImageURL"})
+		if err != nil {
+			log.Fatalf("Error while writing to file: %s\n", err)
+			os.Exit(1)
+		}
 	}
 
 	var buf [][]string
@@ -79,36 +83,41 @@ func writer(c <-chan []string) {
 		}
 
 		if flush {
-			flushBuf(w, &buf, force)
+			err := flushBuf(w, &buf, force)
+			if err != nil {
+				log.Fatalf("Error while writing to file: %s\n", err)
+				os.Exit(1)
+			}
 		}
 	}
 exitLoop:
 	flushBuf(w, &buf, true)
 }
 
-func flushBuf(w *csv.Writer, bufPtr *[][]string, force bool) {
+func flushBuf(w *csv.Writer, bufPtr *[][]string, force bool) error {
 	buf := *bufPtr
 
 	sort.Slice(buf, func(i, j int) bool {
 		return cast.ToInt(buf[i][0]) < cast.ToInt(buf[j][0])
 	})
 
+	var toWrite [][]string
+
 	if !force {
-		firstHalf := buf[:len(buf)/2]
-		secondHalf := buf[len(buf)/2:]
-
-		*bufPtr = secondHalf
-
-		for _, e := range firstHalf {
-			w.Write(e)
-		}
-		w.Flush()
+		toWrite = buf[:len(buf)/2]
+		*bufPtr = buf[len(buf)/2:]
 	} else {
-		for _, e := range buf {
-			w.Write(e)
-		}
-		w.Flush()
-
+		toWrite = buf
 		*bufPtr = nil
 	}
+
+	for _, e := range toWrite {
+		err := w.Write(e)
+		if err != nil {
+			return err
+		}
+	}
+	w.Flush()
+
+	return nil
 }

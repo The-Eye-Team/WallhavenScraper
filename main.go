@@ -5,11 +5,15 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/http/cookiejar"
 	"os"
+	"os/signal"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/extensions"
@@ -26,11 +30,12 @@ var arguments = struct {
 var checkPre = color.Yellow("[") + color.Green("✓") + color.Yellow("]")
 var crossPre = color.Yellow("[") + color.Red("✗") + color.Yellow("]")
 
-var client = http.Client{
-	CheckRedirect: func(r *http.Request, via []*http.Request) error {
-		r.URL.Opaque = r.URL.Path
-		return nil
-	},
+var client = http.Client{}
+
+var shouldExit int32 = 0
+
+func init() {
+	client.Jar, _ = cookiejar.New(nil)
 }
 
 func downloadFile(URL string, file *os.File, client *http.Client) error {
@@ -111,10 +116,13 @@ func downloadWallpaper(index string, channel chan<- []string, worker *sync.WaitG
 	pictureFile, err := os.Create(arguments.Output + "/" + index + ".jpg")
 	if err != nil {
 		log.Println("Unable to create the file:", err)
+		return
 	}
+
 	err = downloadFile("https://wallpapers.wallhaven.cc/wallpapers/full/wallhaven-"+index+".jpg", pictureFile, &client)
 	if err != nil {
 		log.Println("Unable to download the file:", err)
+		return
 	}
 
 	// Log on request
@@ -128,14 +136,21 @@ func downloadWallpaper(index string, channel chan<- []string, worker *sync.WaitG
 	})
 
 	// Log on error
-	c.OnError(func(_ *colly.Response, err error) {
-		fmt.Println(crossPre+
-			color.Yellow(" [")+
-			color.Red(index)+
-			color.Yellow("]")+
-			color.Red(" Something went wrong:"),
-			err)
-		runtime.Goexit()
+	c.OnError(func(r *colly.Response, err error) {
+		if r.StatusCode == http.StatusUnauthorized {
+			fmt.Printf("Not authorized to download %s.\n", index)
+		} else if r.StatusCode == http.StatusGatewayTimeout {
+			time.Sleep(100 * time.Millisecond)
+			downloadWallpaper(index, channel, worker)
+		} else {
+			fmt.Println(crossPre+
+				color.Yellow(" [")+
+				color.Red(index)+
+				color.Yellow("]")+
+				color.Red(" Something went wrong:"),
+				err)
+			runtime.Goexit()
+		}
 	})
 
 	// Visit page and fill collector
@@ -162,6 +177,9 @@ func main() {
 	var worker sync.WaitGroup
 	var count int
 
+	// Create Ctrl+C Handler
+	go listenCtrlC()
+
 	// Parse arguments from command line
 	parseArgs(os.Args)
 
@@ -172,6 +190,11 @@ func main() {
 
 	// Loop through wallhaven's wallpapers
 	for index := 1; ; index++ {
+		// Check if exit requested
+		if atomic.LoadInt32(&shouldExit) != 0 {
+			break
+		}
+
 		if _, err := os.Stat(arguments.Output + "/" + strconv.Itoa(index) + ".jpg"); os.IsNotExist(err) {
 			worker.Add(1)
 			count++
@@ -189,4 +212,11 @@ func main() {
 			count = 0
 		}
 	}
+}
+
+func listenCtrlC() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	<-c
+	atomic.StoreInt32(&shouldExit, 1)
 }
