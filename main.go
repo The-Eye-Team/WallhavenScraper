@@ -34,7 +34,7 @@ var crossPre = color.Yellow("[") + color.Red("✗") + color.Yellow("]")
 
 var client = http.Client{}
 
-var shouldExit int32 = 0
+var shouldExit int32
 
 func init() {
 	// Remember cookies
@@ -91,6 +91,7 @@ func downloadWallpaper(index string, channel chan<- []string, worker *sync.WaitG
 	c.OnHTML("dd.showcase-uploader", func(e *colly.HTMLElement) {
 		// Scrape username
 		uploader = e.ChildText("a.username")
+
 		// Scrape publication date
 		uploadDate = e.ChildAttr("time", "datetime")
 	})

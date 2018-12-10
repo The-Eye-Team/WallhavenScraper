@@ -51,9 +51,8 @@ func setProfileNsfw() error {
 		fmt.Println(checkPre + " Set profile to accept NSFW.")
 
 		return nil
-	} else {
-		return fmt.Errorf("HTTP %s", res.Status)
 	}
+	return fmt.Errorf("HTTP %s", res.Status)
 }
 
 func getCsrfToken(url string) (string, error) {
