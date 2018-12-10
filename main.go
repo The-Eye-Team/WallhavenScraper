@@ -9,6 +9,7 @@ import (
 	"net/http/cookiejar"
 	"os"
 	"os/signal"
+	"path"
 	"runtime"
 	"strconv"
 	"strings"
@@ -66,7 +67,7 @@ func downloadWallpaper(index string, channel chan<- []string, worker *sync.WaitG
 	defer worker.Done()
 
 	var tags []string
-	var uploader, uploadDate, category, size, views, favorites, NSFW string
+	var uploader, uploadDate, category, size, views, favorites, NSFW, imageURL string
 
 	// Create collector
 	c := colly.NewCollector()
@@ -118,19 +119,10 @@ func downloadWallpaper(index string, channel chan<- []string, worker *sync.WaitG
 		})
 	})
 
-	// Download the picture
-	os.MkdirAll(arguments.Output, os.ModePerm)
-	pictureFile, err := os.Create(arguments.Output + "/" + index + ".jpg")
-	if err != nil {
-		log.Println("Unable to create the file:", err)
-		return
-	}
-
-	err = downloadFile("https://wallpapers.wallhaven.cc/wallpapers/full/wallhaven-"+index+".jpg", pictureFile, &client)
-	if err != nil {
-		log.Println("Unable to download the file:", err)
-		return
-	}
+	// Scrape picture link
+	c.OnHTML("img#wallpaper", func(e *colly.HTMLElement) {
+		imageURL = "https:" + e.Attr("src")
+	})
 
 	// Log on request
 	c.OnRequest(func(r *colly.Request) {
@@ -164,6 +156,19 @@ func downloadWallpaper(index string, channel chan<- []string, worker *sync.WaitG
 	// Visit page and fill collector
 	c.Visit("https://alpha.wallhaven.cc/wallpaper/" + index)
 
+	// Create the file and download the picture
+	os.MkdirAll(arguments.Output, os.ModePerm)
+	pictureFile, err := os.Create(arguments.Output + "/" + index + path.Ext(imageURL))
+	if err != nil {
+		log.Println("Unable to create the file:", err)
+		return
+	}
+	err = downloadFile(imageURL, pictureFile, &client)
+	if err != nil {
+		log.Println("Unable to download the file:", err)
+		return
+	}
+
 	// Write metadata to CSV
 	channel <- []string{
 		index,
@@ -177,7 +182,7 @@ func downloadWallpaper(index string, channel chan<- []string, worker *sync.WaitG
 		uploadDate,
 		arguments.Output + "/" + index + ".jpg",
 		"https://alpha.wallhaven.cc/wallpaper/" + index,
-		"https://wallpapers.wallhaven.cc/wallpapers/full/wallhaven-" + index + ".jpg",
+		imageURL,
 	}
 }
 
