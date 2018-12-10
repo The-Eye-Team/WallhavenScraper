@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+var sessionCookie string
+
 func login(user, pass string) error {
 	token, err := getCsrfToken("https://alpha.wallhaven.cc/")
 	if err != nil { return err }
@@ -45,6 +47,18 @@ func setProfileNsfw() error {
 
 	if res.StatusCode == http.StatusOK {
 		fmt.Println(checkPre + " Set profile to accept NSFW.")
+
+		for _, cookie := range res.Cookies() {
+			if cookie.Name == "wallhaven_session" {
+				sessionCookie = cookie.Value
+				println(sessionCookie)
+				break
+			}
+		}
+
+		if sessionCookie == "" {
+			fmt.Println(crossPre + " Failed to get session cookie.")
+		}
 
 		return nil
 	} else {

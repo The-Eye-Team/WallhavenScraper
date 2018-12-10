@@ -6,7 +6,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"net/http/cookiejar"
 	"os"
 	"os/signal"
 	"runtime"
@@ -36,9 +35,6 @@ var client = http.Client{}
 var shouldExit int32 = 0
 
 func init() {
-	// Remember cookies
-	client.Jar, _ = cookiejar.New(nil)
-
 	// Disable HTTP/2: Empty TLSNextProto map
 	client.Transport = http.DefaultTransport
 	client.Transport.(*http.Transport).TLSNextProto =
@@ -134,6 +130,9 @@ func downloadWallpaper(index string, channel chan<- []string, worker *sync.WaitG
 
 	// Log on request
 	c.OnRequest(func(r *colly.Request) {
+		// Set session cookie
+		r.Headers.Set("Cookie", "wallhaven_session=" + sessionCookie)
+
 		fmt.Println(checkPre+
 			color.Yellow(" [")+
 			color.Green(index)+
@@ -197,7 +196,7 @@ func main() {
 	go writer(channel)
 
 	// Loop through wallhaven's wallpapers
-	for index := 1; ; index++ {
+	for index := 193; ; index++ {
 		// Check if exit requested
 		if atomic.LoadInt32(&shouldExit) != 0 {
 			break
