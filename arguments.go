@@ -37,6 +37,10 @@ func parseArgs(args []string) {
 		Required: false,
 		Help:     "Password"})
 
+	cookie := parser.String("", "cookie", &argparse.Options{
+		Required: false,
+		Help:     "Request cookie"})
+
 	// Parse input
 	err := parser.Parse(args)
 	if err != nil {
@@ -53,6 +57,7 @@ func parseArgs(args []string) {
 
 	arguments.Concurrency = *concurrency
 	arguments.CSV = *csv
+	arguments.Cookie = *cookie
 
 	// Login if username and password are given
 	if *username != "" && *password != "" {

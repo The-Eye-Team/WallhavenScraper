@@ -6,7 +6,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"net/http/cookiejar"
 	"os"
 	"os/signal"
 	"path"
@@ -26,6 +25,7 @@ var arguments = struct {
 	Concurrency int
 	Output      string
 	CSV         string
+	Cookie      string
 }{}
 
 var checkPre = color.Yellow("[") + color.Green("✓") + color.Yellow("]")
@@ -36,9 +36,6 @@ var client = http.Client{}
 var shouldExit int32
 
 func init() {
-	// Remember cookies
-	client.Jar, _ = cookiejar.New(nil)
-
 	// Disable HTTP/2: Empty TLSNextProto map
 	client.Transport = http.DefaultTransport
 	client.Transport.(*http.Transport).TLSNextProto =
@@ -123,6 +120,7 @@ func downloadWallpaper(index string, channel chan<- []string, worker *sync.WaitG
 
 	// Log on request
 	c.OnRequest(func(r *colly.Request) {
+		r.Headers.Set("Cookie", arguments.Cookie)
 		fmt.Println(checkPre+
 			color.Yellow(" [")+
 			color.Green(index)+
