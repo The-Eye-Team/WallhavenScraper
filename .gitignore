@@ -1,3 +1,5 @@
 /WallhavenScraper
 *.csv
 *.jpg
+*.png
+!/scrape.png

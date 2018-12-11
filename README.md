@@ -16,3 +16,5 @@ Run it with:
 Where `-j` is the concurrency, `-o` the output folder for images, and `--csv` the CSV file where metadata will be written.
 
 Enjoy!
+
+![scrape](scrape.png)
