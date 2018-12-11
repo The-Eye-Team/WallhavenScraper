@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/signal"
 	"path"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,6 +33,9 @@ var crossPre = color.Yellow("[") + color.Red("✗") + color.Yellow("]")
 var client = http.Client{}
 
 var shouldExit int32
+var workers sync.WaitGroup
+var jobs chan string
+var results chan []string
 
 func init() {
 	// Disable HTTP/2: Empty TLSNextProto map
@@ -59,12 +61,7 @@ func downloadFile(URL string, file *os.File, client *http.Client) error {
 	return nil
 }
 
-func startDownloadWallpaper(index string, channel chan<- []string, worker *sync.WaitGroup) {
-	downloadWallpaper(index, channel)
-	worker.Done()
-}
-
-func downloadWallpaper(index string, channel chan<- []string) {
+func downloadWallpaper(index string, retry bool) {
 	var tags []string
 	var uploader, uploadDate, category, size, views, favorites, NSFW, imageURL string
 
@@ -139,7 +136,11 @@ func downloadWallpaper(index string, channel chan<- []string) {
 			fmt.Printf("Not authorized to download %s.\n", index)
 		case http.StatusBadGateway:
 			time.Sleep(100 * time.Millisecond)
-			downloadWallpaper(index, channel)
+			if retry {
+				downloadWallpaper(index, false)
+			} else {
+				fmt.Printf("Double Bad Gateway on %s\n", index)
+			}
 		default:
 			fmt.Println(crossPre+
 				color.Yellow(" [")+
@@ -147,9 +148,11 @@ func downloadWallpaper(index string, channel chan<- []string) {
 				color.Yellow("]")+
 				color.Red(" Something went wrong:"),
 				err)
-			runtime.Goexit()
+			return
 		}
 	})
+
+	c.SetRequestTimeout(10 * time.Second)
 
 	// Visit page and fill collector
 	c.Visit("https://alpha.wallhaven.cc/wallpaper/" + index)
@@ -168,7 +171,7 @@ func downloadWallpaper(index string, channel chan<- []string) {
 	}
 
 	// Write metadata to CSV
-	channel <- []string{
+	results <- []string{
 		index,
 		strings.Join(tags, ","),
 		NSFW,
@@ -185,9 +188,6 @@ func downloadWallpaper(index string, channel chan<- []string) {
 }
 
 func main() {
-	var worker sync.WaitGroup
-	var count int
-
 	// Create Ctrl+C Handler
 	go listenCtrlC()
 
@@ -195,9 +195,15 @@ func main() {
 	parseArgs(os.Args)
 
 	// Create CSV writer channel
-	channel := make(chan []string)
-	defer close(channel)
-	go writer(channel)
+	results = make(chan []string)
+	defer close(results)
+	go writer(results)
+
+	// Start workers
+	jobs = make(chan string)
+	for i := 0; i < arguments.Concurrency; i++ {
+		go worker()
+	}
 
 	// Loop through wallhaven's wallpapers
 	for index := 1; ; index++ {
@@ -207,9 +213,8 @@ func main() {
 		}
 
 		if _, err := os.Stat(arguments.Output + "/" + strconv.Itoa(index) + ".jpg"); os.IsNotExist(err) {
-			worker.Add(1)
-			count++
-			go startDownloadWallpaper(strconv.Itoa(index), channel, &worker)
+			workers.Add(1)
+			jobs <- strconv.Itoa(index)
 		} else {
 			fmt.Println(crossPre + color.Yellow(" [") +
 				color.Red(index) +
@@ -218,10 +223,17 @@ func main() {
 				color.Green(index) +
 				color.Red(" already downloaded, skipping."))
 		}
-		if count == arguments.Concurrency {
-			worker.Wait()
-			count = 0
-		}
+	}
+
+	close(jobs)
+
+	workers.Wait()
+}
+
+func worker() {
+	for job := range jobs {
+		downloadWallpaper(job, true)
+		workers.Done()
 	}
 }
 
@@ -229,5 +241,9 @@ func listenCtrlC() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	<-c
+	fmt.Fprintln(os.Stderr, "\nExit requested... Waiting for images to DL")
 	atomic.StoreInt32(&shouldExit, 1)
+	<-c
+	fmt.Fprintln(os.Stderr, "\nForce exit")
+	os.Exit(255)
 }
