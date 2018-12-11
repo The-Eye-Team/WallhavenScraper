@@ -78,7 +78,7 @@ func tryDownloadFile(URL string, file *os.File, client *http.Client) error {
 	return nil
 }
 
-func downloadWallpaper(index string, retry bool) {
+func downloadWallpaper(index string) {
 	var tags []string
 	var uploader, uploadDate, category, size, views, favorites, NSFW, imageURL string
 
@@ -153,11 +153,7 @@ func downloadWallpaper(index string, retry bool) {
 			fmt.Printf("Not authorized to download %s.\n", index)
 		case http.StatusBadGateway:
 			time.Sleep(100 * time.Millisecond)
-			if retry {
-				downloadWallpaper(index, false)
-			} else {
-				fmt.Printf("Double Bad Gateway on %s\n", index)
-			}
+			downloadWallpaper(index)
 		default:
 			fmt.Println(crossPre+
 				color.Yellow(" [")+
@@ -254,7 +250,7 @@ func main() {
 
 func worker() {
 	for job := range jobs {
-		downloadWallpaper(job, true)
+		downloadWallpaper(job)
 		workers.Done()
 	}
 }
