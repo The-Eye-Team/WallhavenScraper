@@ -133,9 +133,6 @@ func downloadWallpaper(index string, retry bool) {
 	// Scrape picture link
 	c.OnHTML("img#wallpaper", func(e *colly.HTMLElement) {
 		imageURL = "https:" + e.Attr("src")
-		if imageURL == "" {
-			imageURL = "https://wallpapers.wallhaven.cc/wallpapers/full/wallhaven-" + index + ".jpg"
-		}
 	})
 
 	// Log on request
@@ -171,6 +168,11 @@ func downloadWallpaper(index string, retry bool) {
 			return
 		}
 	})
+
+	// Fallback to default jpeg path
+	if imageURL == "" {
+		imageURL = "https://wallpapers.wallhaven.cc/wallpapers/full/wallhaven-" + index + ".jpg"
+	}
 
 	c.SetRequestTimeout(10 * time.Second)
 
