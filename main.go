@@ -47,17 +47,17 @@ func init() {
 }
 
 // Veri ugly code
-func downloadFile(URL string, file *os.File, client *http.Client) (finalURL string, err error) {
-	err = tryDownloadFile(URL, file, client)
+func downloadFile(URL string, index string, client *http.Client) (finalURL string, err error) {
+	err = tryDownloadFile(URL, index, client)
 	if err == nil { return URL, nil }
 	// Ugly af
 	if err.Error() == "404" && strings.HasSuffix(URL, ".jpg") {
-		return downloadFile(strings.TrimSuffix(URL, ".jpg") + ".png", file, client)
+		return downloadFile(strings.TrimSuffix(URL, ".jpg") + ".png", index, client)
 	}
 	return "", err
 }
 
-func tryDownloadFile(URL string, file *os.File, client *http.Client) error {
+func tryDownloadFile(URL string, index string, client *http.Client) error {
 	// Fetch the data from the URL
 	resp, err := client.Get(URL)
 	if err != nil {
@@ -67,6 +67,13 @@ func tryDownloadFile(URL string, file *os.File, client *http.Client) error {
 
 	if resp.StatusCode == 404 {
 		return errors.New("404")
+	}
+
+	// Create the file
+	file, err := os.Create(arguments.Output + "/" + index + path.Ext(URL))
+	if err != nil {
+		log.Println("Unable to create the file:", err)
+		return err
 	}
 
 	// Write the data to the file
@@ -178,12 +185,7 @@ func downloadWallpaper(index string) {
 
 	// Create the file and download the picture
 	os.MkdirAll(arguments.Output, os.ModePerm)
-	pictureFile, err := os.Create(arguments.Output + "/" + index + path.Ext(imageURL))
-	if err != nil {
-		log.Println("Unable to create the file:", err)
-		return
-	}
-	imageURL, err = downloadFile(imageURL, pictureFile, &client)
+	imageURL, err := downloadFile(imageURL, index, &client)
 	if err != nil {
 		log.Println("Unable to download the file:", err)
 		return
