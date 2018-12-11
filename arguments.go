@@ -41,6 +41,11 @@ func parseArgs(args []string) {
 		Required: false,
 		Help:     "Request cookie"})
 
+	minID := parser.Int("s", "start-id", &argparse.Options{
+		Required: false,
+		Help:     "Minimum picture ID",
+		Default:  1})
+
 	// Parse input
 	err := parser.Parse(args)
 	if err != nil {
@@ -58,6 +63,7 @@ func parseArgs(args []string) {
 	arguments.Concurrency = *concurrency
 	arguments.CSV = *csv
 	arguments.Cookie = *cookie
+	arguments.MinID = *minID
 
 	// Login if username and password are given
 	if *username != "" && *password != "" {

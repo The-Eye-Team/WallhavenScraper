@@ -26,6 +26,7 @@ var arguments = struct {
 	Output      string
 	CSV         string
 	Cookie      string
+	MinID       int
 }{}
 
 var checkPre = color.Yellow("[") + color.Green("✓") + color.Yellow("]")
@@ -224,7 +225,7 @@ func main() {
 	}
 
 	// Loop through wallhaven's wallpapers
-	for index := 1; ; index++ {
+	for index := arguments.MinID; ; index++ {
 		// Check if exit requested
 		if atomic.LoadInt32(&shouldExit) != 0 {
 			break
