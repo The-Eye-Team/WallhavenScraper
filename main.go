@@ -59,9 +59,12 @@ func downloadFile(URL string, file *os.File, client *http.Client) error {
 	return nil
 }
 
-func downloadWallpaper(index string, channel chan<- []string, worker *sync.WaitGroup) {
-	defer worker.Done()
+func startDownloadWallpaper(index string, channel chan<- []string, worker *sync.WaitGroup) {
+	downloadWallpaper(index, channel)
+	worker.Done()
+}
 
+func downloadWallpaper(index string, channel chan<- []string) {
 	var tags []string
 	var uploader, uploadDate, category, size, views, favorites, NSFW, imageURL string
 
@@ -136,7 +139,7 @@ func downloadWallpaper(index string, channel chan<- []string, worker *sync.WaitG
 			fmt.Printf("Not authorized to download %s.\n", index)
 		case http.StatusBadGateway:
 			time.Sleep(100 * time.Millisecond)
-			downloadWallpaper(index, channel, worker)
+			downloadWallpaper(index, channel)
 		default:
 			fmt.Println(crossPre+
 				color.Yellow(" [")+
@@ -206,7 +209,7 @@ func main() {
 		if _, err := os.Stat(arguments.Output + "/" + strconv.Itoa(index) + ".jpg"); os.IsNotExist(err) {
 			worker.Add(1)
 			count++
-			go downloadWallpaper(strconv.Itoa(index), channel, &worker)
+			go startDownloadWallpaper(strconv.Itoa(index), channel, &worker)
 		} else {
 			fmt.Println(crossPre + color.Yellow(" [") +
 				color.Red(index) +
