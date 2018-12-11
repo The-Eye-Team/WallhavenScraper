@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/gocolly/colly"
-	"github.com/gocolly/colly/extensions"
 	"github.com/labstack/gommon/color"
 )
 
@@ -66,9 +65,6 @@ func downloadWallpaper(index string, channel chan<- []string, worker *sync.WaitG
 
 	// Create collector
 	c := colly.NewCollector()
-
-	// Randomize user agent on every request
-	extensions.RandomUserAgent(c)
 
 	// Scrape tags
 	c.OnHTML("ul#tags", func(e *colly.HTMLElement) {
