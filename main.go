@@ -27,6 +27,7 @@ var arguments = struct {
 	CSV         string
 	Cookie      string
 	MinID       int
+	RateKiB     float64
 }{}
 
 var checkPre = color.Yellow("[") + color.Green("✓") + color.Yellow("]")
@@ -38,6 +39,9 @@ var shouldExit int32
 var workers sync.WaitGroup
 var jobs chan string
 var results chan []string
+
+var totalRead int64 = 0
+var startTime = time.Now()
 
 func init() {
 	// Disable HTTP/2: Empty TLSNextProto map
@@ -58,6 +62,14 @@ func downloadFile(URL string, index string, client *http.Client) (finalURL strin
 }
 
 func tryDownloadFile(URL string, index string, client *http.Client) error {
+	// Rate limit sleep
+	if arguments.RateKiB > 0 {
+		rate := float64(atomic.LoadInt64(&totalRead) / 1000) / time.Since(startTime).Seconds()
+		for rate > arguments.RateKiB && atomic.LoadInt32(&shouldExit) == 0 {
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+
 	// Fetch the data from the URL
 	resp, err := client.Get(URL)
 	if err != nil {
@@ -77,11 +89,14 @@ func tryDownloadFile(URL string, index string, client *http.Client) error {
 	}
 
 	// Write the data to the file
-	_, err = io.Copy(file, resp.Body)
+	var n int64
+	n, err = io.Copy(file, resp.Body)
 	defer file.Close()
 	if err != nil {
 		return err
 	}
+
+	atomic.AddInt64(&totalRead, n)
 
 	return nil
 }
