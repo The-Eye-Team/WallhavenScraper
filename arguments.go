@@ -46,6 +46,10 @@ func parseArgs(args []string) {
 		Help:     "Minimum picture ID",
 		Default:  1})
 
+	rateLimit := parser.Float("", "rate-limit", &argparse.Options{
+		Required: false,
+		Help:     "Rate limit in KiB/s"})
+
 	// Parse input
 	err := parser.Parse(args)
 	if err != nil {
@@ -64,6 +68,7 @@ func parseArgs(args []string) {
 	arguments.CSV = *csv
 	arguments.Cookie = *cookie
 	arguments.MinID = *minID
+	arguments.RateKiB = *rateLimit
 
 	// Login if username and password are given
 	if *username != "" && *password != "" {
